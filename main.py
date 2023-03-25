@@ -19,25 +19,25 @@ class PatchActor(PostActor):
     last_name: Optional[str] = None
 
 class Actor(PostActor):
-    id: int
+    actor_id: int
     last_update: str
 
 
 actor_list: List[Actor] = [
     Actor(
-        id=1,
+        actor_id=1,
         last_update=datetime.now().isoformat(),
         name="José",
         last_name="Díaz"
     ),
     Actor(
-        id=2,
+        actor_id=2,
         last_update=datetime.now().isoformat(),
         name="Max",
         last_name="Mendez"
     ),
     Actor(
-        id=3,
+        actor_id=3,
         last_update=datetime.now().isoformat(),
         name="Juan",
         last_name="García"
@@ -53,7 +53,7 @@ async def post_actor(actor: PostActor, response: Response) -> Actor:
     response.status_code = 201
     actor_list.append(
         Actor(
-            id=len(actor_list)+1,
+            actor_id=len(actor_list)+1,
             last_update=datetime.now().isoformat(),
             name=actor.name,
             last_name=actor.last_name
