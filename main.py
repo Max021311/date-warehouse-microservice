@@ -1,8 +1,41 @@
-from fastapi import FastAPI, Response
+from fastapi import Depends, FastAPI, Response
 from fastapi.responses import JSONResponse
 from datetime import datetime
 from typing import List, Optional
 from pydantic import BaseModel
+from sqlalchemy import create_engine
+from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column, sessionmaker
+import sqlalchemy.types as TYPES
+
+class Base (DeclarativeBase):
+    pass
+
+class ActorModel (Base):
+    __tablename__ = "actor"
+
+    actor_id: Mapped[int] = mapped_column(primary_key=True)
+    first_name: Mapped[str] = mapped_column(TYPES.String(45), nullable=False)
+    last_name: Mapped[str] = mapped_column(TYPES.String(45), nullable=False)
+    last_update: Mapped[datetime] = mapped_column(TYPES.DateTime(timezone=True), server_default="NOW()")
+
+DB_USER = "postgres"
+DB_PASSWORD = "postgres"
+DB_HOST="localhost"
+DB_NAME="postgres"
+
+SQLALCHEMY_DATABASE_URL = f"postgresql://{DB_USER}:{DB_PASSWORD}@{DB_HOST}/{DB_NAME}"
+
+engine = create_engine(SQLALCHEMY_DATABASE_URL)
+
+SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
+
+def get_db():
+    db = SessionLocal()
+    try:
+        yield db
+    finally:
+        db.close()
+
 
 app = FastAPI()
 
@@ -11,82 +44,66 @@ async def ok():
     return JSONResponse(content="ok", status_code=200)
 
 class PostActor(BaseModel):
-    name: str
-    last_name: str 
+    first_name: str
+    last_name: str
 
 class PatchActor(PostActor):
-    name: Optional[str] = None
+    first_name: Optional[str] = None
     last_name: Optional[str] = None
 
 class Actor(PostActor):
     actor_id: int
-    last_update: str
+    last_update: datetime
 
+    class Config:
+        orm_mode = True
 
-actor_list: List[Actor] = [
-    Actor(
-        actor_id=1,
-        last_update=datetime.now().isoformat(),
-        name="José",
-        last_name="Díaz"
-    ),
-    Actor(
-        actor_id=2,
-        last_update=datetime.now().isoformat(),
-        name="Max",
-        last_name="Mendez"
-    ),
-    Actor(
-        actor_id=3,
-        last_update=datetime.now().isoformat(),
-        name="Juan",
-        last_name="García"
-    )
-]
+@app.get('/actor', response_model=List[Actor])
+async def list_actors(offset: int = 0, limit: int = 10, db: Session = Depends(get_db)):
+    return db.query(ActorModel).offset(offset).limit(limit).all()
 
-@app.get('/actor')
-async def list_actors() -> List[Actor]:
-    return actor_list
-
-@app.post('/actor')
-async def post_actor(actor: PostActor, response: Response) -> Actor:
+@app.post('/actor', response_model=Actor)
+async def post_actor(actor: PostActor, response: Response, db: Session = Depends(get_db)):
+    actor_model = ActorModel(**actor.dict())
+    db.add(actor_model)
+    db.commit()
+    db.refresh(actor_model)
     response.status_code = 201
-    actor_list.append(
-        Actor(
-            actor_id=len(actor_list)+1,
-            last_update=datetime.now().isoformat(),
-            name=actor.name,
-            last_name=actor.last_name
-        )
-    )
-    return actor_list[-1]
+    return actor_model
 
-@app.patch('/actor/{id}')
-async def patch_actor(id: int, actor_to_patch: PatchActor, response: Response) -> Actor|None:
-    if id > (len(actor_list) - 1) or id < 0:
-        response.status_code = 404
-        return None
-    else:
-        response.status_code=200
-        actor_list[id] = actor_list[id].copy(update=actor_to_patch.dict(exclude_defaults=True))
-        return actor_list[id]
+@app.patch('/actor/{id}', response_model=Actor|None)
+async def patch_actor(id: int, body: PatchActor, response: Response, db: Session = Depends(get_db)):
+    actor_model = db.get(ActorModel, id)
+    if (actor_model == None):
+        response.status_code=404
+        return
+    if body.first_name != None:
+        actor_model.first_name = body.first_name
+    if body.last_name != None:
+        actor_model.first_name = body.last_name
+    db.commit()
+    db.refresh(actor_model)
+    response.status_code=200
+    return actor_model
 
-@app.get('/actor/{id}')
-async def get_actor(id: int, response: Response) -> Actor|None:
-    if id > (len(actor_list) - 1) or id < 0:
+@app.get('/actor/{id}', response_model=Actor|None)
+async def get_actor(id: int, response: Response, db: Session = Depends(get_db)):
+    actor_model = db.get(ActorModel, id)
+    if actor_model == None:
         response.status_code = 404
         return None
     else:
         response.status_code = 200
-        return actor_list[id]
+        return actor_model
 
 @app.delete('/actor/{id}')
-async def delete_actor(id: int, response: Response):
-    if id > (len(actor_list) - 1) or id < 0:
+async def delete_actor(id: int, response: Response, db: Session = Depends(get_db)):
+    actor_model = db.get(ActorModel, id)
+    if actor_model == None:
         response.status_code = 404
         return None
     else:
-        actor_list.remove(actor_list[id])
-        print(f"Deleted actor with id: {id}")
-        response.status_code=204
-        return
+        db.delete(actor_model)
+        db.commit()
+        response.status_code = 204
+        return None
