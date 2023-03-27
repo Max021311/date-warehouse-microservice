@@ -10,6 +10,8 @@ packages = [{include = "date_warehouse_microservice"}]
 python = "^3.11"
 fastapi = "^0.95.0"
 uvicorn = {extras = ["standard"], version = "^0.21.1"}
+sqlalchemy = "^2.0.7"
+psycopg2 = "^2.9.5"
 
 [tool.pyright]
 venvPath="."
