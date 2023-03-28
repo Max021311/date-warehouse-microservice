@@ -1,3 +1,19 @@
+# Integrantes:
+# Díaz Méndez José Maximiliano
+# Luna Robles José Alejandro
+# Mora García José Uriel
+# Téllez Díaz Ramón Emilio
+# Valencia García Edgar Armando
+
+# Github: https://github.com/Max021311/date-warehouse-microservice
+
+# Dependencias:
+# python = "^3.11"
+# fastapi = "^0.95.0"
+# uvicorn = {extras = ["standard"], version = "^0.21.1"}
+# sqlalchemy = "^2.0.7"
+# psycopg2 = "^2.9.5"
+
 from fastapi import Depends, FastAPI, Response
 from fastapi.responses import JSONResponse
 from datetime import datetime
